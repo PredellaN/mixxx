@@ -454,8 +454,11 @@ void Tooltips::addStandardTooltips() {
             tr("When tapped, moves the beatgrid left by a small amount.");
     const QString beatsTranslateLaterDescription =
             tr("When tapped, moves the beatgrid right by a small amount.");
-    const QString moveHalfBeat =
-            tr("Adjust beatgrid by exactly one half beat. "
+    const QString moveHalfBeatEarlier =
+            tr("Adjust beatgrid left by exactly one half beat. "
+               "Usable only on\ntracks with constant tempo.");
+    const QString moveHalfBeatLater =
+            tr("Adjust beatgrid right by exactly one half beat. "
                "Usable only on\ntracks with constant tempo.");
 
     add("beats_translate_earlier")
@@ -466,15 +469,27 @@ void Tooltips::addStandardTooltips() {
             << beatsTranslateLaterTitle
             << beatsTranslateLaterDescription;
 
+    add("beats_translate_half_earlier")
+            << beatsTranslateEarlierTitle
+            << moveHalfBeatEarlier;
+
+    add("beats_translate_half_later")
+            << beatsTranslateLaterTitle
+            << moveHalfBeatLater;
+
+    add("beats_translate_half")
+            << beatsTranslateLaterTitle
+            << moveHalfBeatLater;
+
     add("beats_translate_earlier_move_half_beat")
             << beatsTranslateEarlierTitle
             << QString("%1: %2").arg(leftClick, beatsTranslateEarlierDescription)
-            << QString("%1: %2").arg(rightClick, moveHalfBeat);
+            << QString("%1: %2").arg(rightClick, moveHalfBeatEarlier);
 
     add("beats_translate_later_move_half_beat")
             << beatsTranslateLaterTitle
             << QString("%1: %2").arg(leftClick, beatsTranslateLaterDescription)
-            << QString("%1: %2").arg(rightClick, moveHalfBeat);
+            << QString("%1: %2").arg(rightClick, moveHalfBeatLater);
 
     add("beats_translate_curpos")
             << tr("Adjust Beatgrid")

@@ -126,3 +126,38 @@ TEST_F(BeatsTranslateTest, BeatsUndoTest) {
     pBeats = m_pTrack1->getBeats();
     EXPECT_FRAMEPOS_EQ(origin123, pBeats->findClosestBeat(mixxx::audio::kStartFramePos));
 }
+
+TEST_F(BeatsTranslateTest, BeatsTranslateHalfEarlierAndLater) {
+    const auto bpm60 = mixxx::Bpm(60.0);
+    const auto origin = mixxx::audio::FramePos{0.0};
+    auto grid = mixxx::Beats::fromConstTempo(
+            m_pTrack1->getSampleRate(), origin, bpm60);
+    m_pTrack1->trySetBeats(grid);
+
+    // 60 BPM @ sample rate: 1 beat length = sampleRate frames.
+    const double beatLength = m_pTrack1->getSampleRate();
+    const double halfBeatLength = beatLength / 2.0;
+
+    auto pTranslateHalfEarlier = std::make_unique<ControlProxy>(
+            m_sGroup1, "beats_translate_half_earlier");
+    auto pTranslateHalfLater = std::make_unique<ControlProxy>(
+            m_sGroup1, "beats_translate_half_later");
+
+    // Translate half beat later (+0.5 beats -> grid moves right / later by +halfBeatLength)
+    pTranslateHalfLater->set(1.0);
+    ProcessBuffer();
+    EXPECT_FRAMEPOS_EQ(mixxx::audio::FramePos{halfBeatLength},
+            *m_pTrack1->getBeats()->cfirstmarker());
+
+    // Translate half beat earlier (-0.5 beats -> grid moves left / earlier by
+    // -halfBeatLength back to origin)
+    pTranslateHalfEarlier->set(1.0);
+    ProcessBuffer();
+    EXPECT_FRAMEPOS_EQ(origin, *m_pTrack1->getBeats()->cfirstmarker());
+
+    // Translate half beat earlier again (-0.5 beats -> grid moves left by -halfBeatLength)
+    pTranslateHalfEarlier->set(1.0);
+    ProcessBuffer();
+    EXPECT_FRAMEPOS_EQ(mixxx::audio::FramePos{-halfBeatLength},
+            *m_pTrack1->getBeats()->cfirstmarker());
+}

@@ -989,6 +989,16 @@ declare namespace MixxxControls {
         | 'beats_translate_earlier'
 
         /**
+         * Move beatgrid earlier by exactly half a beat. Works only for tracks with constant tempo.
+         *
+         * @groups [ChannelN], [PreviewDeckN], [SamplerN]
+         * @range binary
+         * @feedback The beatgrid moves left by exactly half a beat.
+         * @since New in version 2.6.0.
+         */
+        | 'beats_translate_half_earlier'
+
+        /**
          * Move beatgrid by exactly half a beat. Works only for tracks with constant tempo.
          *
          * @groups [ChannelN], [PreviewDeckN], [SamplerN]
@@ -997,6 +1007,16 @@ declare namespace MixxxControls {
          * @since New in version 2.6.0.
          */
         | 'beats_translate_half'
+
+        /**
+         * Move beatgrid later by exactly half a beat. Works only for tracks with constant tempo.
+         *
+         * @groups [ChannelN], [PreviewDeckN], [SamplerN]
+         * @range binary
+         * @feedback The beatgrid moves right by exactly half a beat.
+         * @since New in version 2.6.0.
+         */
+        | 'beats_translate_half_later'
 
         /**
          * Move beatgrid to a later position.

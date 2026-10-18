@@ -342,6 +342,16 @@ ControlPickerMenu::ControlPickerMenu(QWidget* pParent)
             tr("Move Beatgrid"),
             tr("Adjust the beatgrid to the left or right"),
             pBpmMenu);
+    addDeckControl("beats_translate_half_earlier",
+            tr("Move Beatgrid Half a Beat Earlier"),
+            tr("Adjust the beatgrid earlier by exactly one half beat. Usable only for "
+               "tracks with constant tempo."),
+            pBpmMenu);
+    addDeckControl("beats_translate_half_later",
+            tr("Move Beatgrid Half a Beat Later"),
+            tr("Adjust the beatgrid later by exactly one half beat. Usable only for "
+               "tracks with constant tempo."),
+            pBpmMenu);
     addDeckControl("beats_translate_half",
             tr("Move Beatgrid Half a Beat"),
             tr("Adjust the beatgrid by exactly one half beat. Usable only for "

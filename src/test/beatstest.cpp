@@ -635,4 +635,25 @@ TEST(BeatsTest, IteratorFromFloorUndershoot) {
     EXPECT_LT(std::prev(it)->value(), position.value());
 }
 
+TEST(BeatsTest, OffBeatMarkerAlignment) {
+    auto firstMarkerIt = kConstTempoBeats.cfirstmarker();
+
+    for (int offset = -32; offset <= 32; ++offset) {
+        auto it = firstMarkerIt + offset;
+        int beatIndex = static_cast<int>(it - firstMarkerIt);
+        EXPECT_EQ(offset, beatIndex);
+
+        int mod16 = (beatIndex % 16 + 16) % 16;
+        if (offset % 16 == 0) {
+            EXPECT_EQ(0, mod16);
+        } else if (offset % 8 == 0) {
+            EXPECT_EQ(8, mod16);
+        } else if (offset % 4 == 0) {
+            EXPECT_TRUE(mod16 == 4 || mod16 == 12);
+        } else {
+            EXPECT_TRUE(mod16 != 0 && mod16 != 8 && mod16 != 4 && mod16 != 12);
+        }
+    }
+}
+
 } // namespace

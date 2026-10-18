@@ -77,7 +77,7 @@ RowLayout {
                 iconSource: LateNightTheme.assetDeckBeatsEarlierButton
                 group: root.group
                 key: "beats_translate_earlier"
-                rightClickKey: "beats_translate_half"
+                rightClickKey: "beats_translate_half_earlier"
                 activeBackgroundSuffix: "active"
                 pressedBackgroundSuffix: "active"
                 activeIconSuffix: LateNightTheme.isPaleMoon ? "active" : ""
@@ -132,7 +132,7 @@ RowLayout {
                 iconSource: LateNightTheme.assetDeckBeatsLaterButton
                 group: root.group
                 key: "beats_translate_later"
-                rightClickKey: "beats_translate_half"
+                rightClickKey: "beats_translate_half_later"
                 activeBackgroundSuffix: "active"
                 pressedBackgroundSuffix: "active"
                 activeIconSuffix: LateNightTheme.isPaleMoon ? "active" : ""

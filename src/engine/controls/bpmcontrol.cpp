@@ -117,6 +117,20 @@ BpmControl::BpmControl(const QString& group,
             this,
             &BpmControl::slotTranslateBeatsHalf,
             Qt::DirectConnection);
+    m_pTranslateBeatsHalfEarlier = std::make_unique<ControlPushButton>(
+            ConfigKey(group, "beats_translate_half_earlier"), false);
+    connect(m_pTranslateBeatsHalfEarlier.get(),
+            &ControlObject::valueChanged,
+            this,
+            &BpmControl::slotTranslateBeatsHalfEarlier,
+            Qt::DirectConnection);
+    m_pTranslateBeatsHalfLater = std::make_unique<ControlPushButton>(
+            ConfigKey(group, "beats_translate_half_later"), false);
+    connect(m_pTranslateBeatsHalfLater.get(),
+            &ControlObject::valueChanged,
+            this,
+            &BpmControl::slotTranslateBeatsHalfLater,
+            Qt::DirectConnection);
     m_pTranslateBeatsMove = std::make_unique<ControlEncoder>(
             ConfigKey(group, "beats_translate_move"), false);
     connect(m_pTranslateBeatsMove.get(),
@@ -344,11 +358,7 @@ void BpmControl::slotTranslateBeatsLater(double v) {
     slotTranslateBeatsMove(1);
 }
 
-// slotTranslateBeatsHalf works only with constant BPM tracks
-void BpmControl::slotTranslateBeatsHalf(double v) {
-    if (v <= 0) {
-        return;
-    }
+void BpmControl::translateBeatsFraction(double fraction) {
     const TrackPointer pTrack = getEngineBuffer()->getLoadedTrack();
     if (!pTrack) {
         return;
@@ -357,11 +367,36 @@ void BpmControl::slotTranslateBeatsHalf(double v) {
     if (!pBeats) {
         return;
     }
-    const auto translatedBeats = pBeats->tryTranslateBeats(0.5);
+    const auto translatedBeats = pBeats->tryTranslateBeats(fraction);
     if (!translatedBeats) {
         return;
     }
     pTrack->trySetBeats(*translatedBeats);
+}
+
+// slotTranslateBeatsHalfEarlier works only with constant BPM tracks
+void BpmControl::slotTranslateBeatsHalfEarlier(double v) {
+    if (v <= 0) {
+        return;
+    }
+    translateBeatsFraction(-0.5);
+}
+
+// slotTranslateBeatsHalfLater works only with constant BPM tracks
+void BpmControl::slotTranslateBeatsHalfLater(double v) {
+    if (v <= 0) {
+        return;
+    }
+    translateBeatsFraction(0.5);
+}
+
+// slotTranslateBeatsHalf works only with constant BPM tracks (defaults to +0.5
+// for backward compatibility)
+void BpmControl::slotTranslateBeatsHalf(double v) {
+    if (v <= 0) {
+        return;
+    }
+    translateBeatsFraction(0.5);
 }
 
 void BpmControl::slotTranslateBeatsMove(double v) {

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <QColor>
+#include <QVector>
+#include <array>
 
 #include "skin/legacy/skincontext.h"
 #include "util/class.h"
@@ -16,7 +18,7 @@ class WaveformRenderBeat : public WaveformRendererAbstract {
 
   private:
     QColor m_beatColor;
-    QVector<QLineF> m_beats;
+    std::array<QVector<QLineF>, 4> m_beats;
 
     DISALLOW_COPY_AND_ASSIGN(WaveformRenderBeat);
 };

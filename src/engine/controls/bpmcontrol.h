@@ -103,6 +103,8 @@ class BpmControl : public EngineControl {
     void slotTranslateBeatsEarlier(double);
     void slotTranslateBeatsLater(double);
     void slotTranslateBeatsHalf(double);
+    void slotTranslateBeatsHalfEarlier(double);
+    void slotTranslateBeatsHalfLater(double);
     void slotTranslateBeatsMove(double);
 
     void slotBpmTap(double value);
@@ -126,6 +128,7 @@ class BpmControl : public EngineControl {
     }
     double calcSyncAdjustment(bool userTweakingSync);
     void adjustBeatsBpm(double deltaBpm);
+    void translateBeatsFraction(double fraction);
     void slotScaleBpm(mixxx::Beats::BpmScale bpmScale);
 
     friend class SyncControl;
@@ -151,6 +154,8 @@ class BpmControl : public EngineControl {
     std::unique_ptr<ControlPushButton> m_pTranslateBeatsEarlier;
     std::unique_ptr<ControlPushButton> m_pTranslateBeatsLater;
     std::unique_ptr<ControlPushButton> m_pTranslateBeatsHalf;
+    std::unique_ptr<ControlPushButton> m_pTranslateBeatsHalfEarlier;
+    std::unique_ptr<ControlPushButton> m_pTranslateBeatsHalfLater;
     std::unique_ptr<ControlEncoder> m_pTranslateBeatsMove;
     std::unique_ptr<ControlPushButton> m_pBeatsUndo;
     std::unique_ptr<ControlObject> m_pBeatsUndoPossible;

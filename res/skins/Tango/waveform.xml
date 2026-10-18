@@ -172,7 +172,7 @@ Variables:
                     <SetVariable name="ObjectName">BeatgridEarlier</SetVariable>
                     <SetVariable name="Size">28f,24f</SetVariable>
                     <SetVariable name="ConfigKey"><Variable name="Group"/>,beats_translate_earlier</SetVariable>
-                    <SetVariable name="ConfigKeyRight"><Variable name="Group"/>,beats_translate_half</SetVariable>
+                    <SetVariable name="ConfigKeyRight"><Variable name="Group"/>,beats_translate_half_earlier</SetVariable>
                   </Template>
 
                   <Template src="skins:Tango/controls/button_1state_optional.xml">
@@ -193,7 +193,7 @@ Variables:
                     <SetVariable name="ObjectName">BeatgridLater</SetVariable>
                     <SetVariable name="Size">28f,24f</SetVariable>
                     <SetVariable name="ConfigKey"><Variable name="Group"/>,beats_translate_later</SetVariable>
-                    <SetVariable name="ConfigKeyRight"><Variable name="Group"/>,beats_translate_half</SetVariable>
+                    <SetVariable name="ConfigKeyRight"><Variable name="Group"/>,beats_translate_half_later</SetVariable>
                   </Template>
 
                   <Template src="skins:Tango/controls/button_1state_optional.xml">
