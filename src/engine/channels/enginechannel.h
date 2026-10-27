@@ -75,6 +75,10 @@ class EngineChannel : public EngineObject {
         return nullptr;
     }
 
+    virtual CSAMPLE* getHeadphoneBuffer() {
+        return nullptr;
+    }
+
   protected:
     const ChannelHandleAndGroup m_group;
     EffectsManager* m_pEffectsManager;

@@ -40,7 +40,7 @@ void ChannelMixer::applyEffectsAndMixChannels(const EngineMixer::GainCalculator&
         gainCache.m_gain = newGain;
         pEngineEffectsManager->processPostFaderAndMix(pChannelInfo->m_handle,
                 outputHandle,
-                pChannelInfo->m_pBuffer.data(),
+                pChannelInfo->getHeadphoneBuffer(),
                 pOutput,
                 bufferSize,
                 sampleRate,

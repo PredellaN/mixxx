@@ -12,6 +12,7 @@
 #include "moc_enginedeck.cpp"
 #include "track/track.h"
 #include "util/assert.h"
+#include "util/defs.h"
 #include "util/sample.h"
 
 EngineDeck::EngineDeck(
@@ -26,7 +27,11 @@ EngineDeck::EngineDeck(
                   primaryDeck),
           m_pConfig(pConfig),
 #ifdef __STEM__
+          m_headphoneBuffer(kMaxEngineSamples),
+          m_cuedStemBuffer(kMaxEngineSamples),
+          m_cuedStemsMixBuffer(kMaxEngineSamples),
           m_stemClonedState(false),
+          m_hasStemPfl(false),
 #endif
           m_pInputConfigured(new ControlObject(ConfigKey(getGroup(), "input_configured"))),
           m_pPassing(new ControlPushButton(ConfigKey(getGroup(), "passthrough"))) {
@@ -68,6 +73,7 @@ EngineDeck::EngineDeck(
 
     m_stemGain.reserve(mixxx::kMaxSupportedStems);
     m_stemMute.reserve(mixxx::kMaxSupportedStems);
+    m_stemPfl.reserve(mixxx::kMaxSupportedStems);
     m_stemVuMeter.reserve(mixxx::kMaxSupportedStems);
     for (int stemIdx = 0; stemIdx < mixxx::kMaxSupportedStems; stemIdx++) {
         m_stemGain.emplace_back(std::make_unique<ControlPotmeter>(
@@ -81,6 +87,11 @@ EngineDeck::EngineDeck(
                 ConfigKey(getGroupForStem(getGroup(), stemIdx), QStringLiteral("mute")));
         pMuteButton->setButtonMode(mixxx::control::ButtonMode::PowerWindow);
         m_stemMute.push_back(std::move(pMuteButton));
+
+        auto pPflButton = std::make_unique<ControlPushButton>(
+                ConfigKey(getGroupForStem(getGroup(), stemIdx), QStringLiteral("pfl")));
+        pPflButton->setButtonMode(mixxx::control::ButtonMode::Toggle);
+        m_stemPfl.push_back(std::move(pPflButton));
 
         m_stemVuMeter.emplace_back(std::make_unique<EngineVuMeter>(
                 getGroupForStem(getGroup(), stemIdx), QString(), false));
@@ -100,6 +111,7 @@ void EngineDeck::slotTrackLoaded(TrackPointer pNewTrack,
         for (int stemIdx = 0; stemIdx < mixxx::kMaxSupportedStems; stemIdx++) {
             m_stemGain[stemIdx]->set(1.0);
             m_stemMute[stemIdx]->set(0.0);
+            m_stemPfl[stemIdx]->set(0.0);
         }
     }
     m_stemClonedState = false;
@@ -122,6 +134,7 @@ EngineDeck::~EngineDeck() {
 void EngineDeck::addStemHandle(const ChannelHandleAndGroup& stemHandleGroup) {
     m_stems.emplace_back(ChannelHandleAndGroup(stemHandleGroup.handle(), stemHandleGroup.name()));
     m_stemsGainCache.push_back(CSAMPLE_GAIN_ONE);
+    m_stemsPflGainCache.push_back(CSAMPLE_GAIN_ZERO);
     if (m_pEffectsManager != nullptr) {
         m_pEffectsManager->registerInputChannel(stemHandleGroup);
     }
@@ -131,6 +144,7 @@ void EngineDeck::processStem(CSAMPLE* pOut, const std::size_t bufferSize) {
     mixxx::audio::ChannelCount chCount = m_pBuffer->getChannelCount();
     VERIFY_OR_DEBUG_ASSERT(m_stems.size() <= chCount &&
             m_stemMute.size() <= chCount && m_stemGain.size() <= chCount &&
+            m_stemPfl.size() <= chCount &&
             m_stemVuMeter.size() <= chCount) {
         return;
     };
@@ -153,7 +167,29 @@ void EngineDeck::processStem(CSAMPLE* pOut, const std::size_t bufferSize) {
         // If we don't have an engine manager to mix the stem together, we mixed
         // the multi channel into stereo and return early.
         SampleUtil::mixMultichannelToStereo(pOut, pIn, numFrames, chCount);
+        m_hasStemPfl = false;
         return;
+    }
+
+    bool deckPfl = isPflEnabled();
+    bool anyStemCued = false;
+    if (deckPfl) {
+        for (unsigned int stemIdx = 0; stemIdx < stemCount; ++stemIdx) {
+            float stemGain = m_stemMute[stemIdx]->toBool()
+                    ? 0.0f
+                    : static_cast<float>(m_stemGain[stemIdx]->get());
+            CSAMPLE_GAIN prevPflGain = (stemIdx < m_stemsPflGainCache.size())
+                    ? m_stemsPflGainCache[stemIdx]
+                    : CSAMPLE_GAIN_ZERO;
+            if (stemGain == 0.0f && (m_stemPfl[stemIdx]->toBool() || prevPflGain > 0.0f)) {
+                anyStemCued = true;
+                break;
+            }
+        }
+    }
+
+    if (anyStemCued) {
+        SampleUtil::clear(m_cuedStemsMixBuffer.data(), bufferSize);
     }
 
     // We will now mix each stem (stereo channel) into a single "output"
@@ -167,6 +203,37 @@ void EngineDeck::processStem(CSAMPLE* pOut, const std::size_t bufferSize) {
         float stemGain = m_stemMute[stemIdx]->toBool()
                 ? 0.0f
                 : static_cast<float>(m_stemGain[stemIdx]->get());
+
+        if (anyStemCued) {
+            bool stemPflActive = deckPfl && m_stemPfl[stemIdx]->toBool();
+            CSAMPLE_GAIN prevPflGain = (stemIdx < m_stemsPflGainCache.size())
+                    ? m_stemsPflGainCache[stemIdx]
+                    : CSAMPLE_GAIN_ZERO;
+            if (stemGain == 0.0f && (stemPflActive || prevPflGain > 0.0f)) {
+                SampleUtil::copyOneStereoFromMulti(
+                        m_cuedStemBuffer.data(),
+                        pIn,
+                        numFrames,
+                        chCount,
+                        chOffset);
+                CSAMPLE_GAIN targetGain = stemPflActive ? CSAMPLE_GAIN_ONE : CSAMPLE_GAIN_ZERO;
+                SampleUtil::applyRampingGain(
+                        m_cuedStemBuffer.data(),
+                        prevPflGain,
+                        targetGain,
+                        bufferSize);
+                if (stemIdx < m_stemsPflGainCache.size()) {
+                    m_stemsPflGainCache[stemIdx] = targetGain;
+                }
+                SampleUtil::add(
+                        m_cuedStemsMixBuffer.data(),
+                        m_cuedStemBuffer.data(),
+                        bufferSize);
+            } else if (stemIdx < m_stemsPflGainCache.size()) {
+                m_stemsPflGainCache[stemIdx] = CSAMPLE_GAIN_ZERO;
+            }
+        }
+
         // Extract the stem frames into the output buffer (LR......LR...... -> LRLR)
         SampleUtil::copyOneStereoFromMulti(
                 pOut,
@@ -202,6 +269,8 @@ void EngineDeck::processStem(CSAMPLE* pOut, const std::size_t bufferSize) {
 
     // Mixxx all the stem tracks together
     SampleUtil::mixMultichannelToStereo(pOut, pIn, numFrames, chCount);
+
+    m_hasStemPfl = anyStemCued;
 }
 
 void EngineDeck::cloneStemState(const EngineDeck* deckToClone) {
@@ -214,13 +283,16 @@ void EngineDeck::cloneStemState(const EngineDeck* deckToClone) {
     }
     VERIFY_OR_DEBUG_ASSERT(m_stemGain.size() == mixxx::kMaxSupportedStems &&
             m_stemMute.size() == mixxx::kMaxSupportedStems &&
+            m_stemPfl.size() == mixxx::kMaxSupportedStems &&
             deckToClone->m_stemGain.size() == mixxx::kMaxSupportedStems &&
-            deckToClone->m_stemMute.size() == mixxx::kMaxSupportedStems) {
+            deckToClone->m_stemMute.size() == mixxx::kMaxSupportedStems &&
+            deckToClone->m_stemPfl.size() == mixxx::kMaxSupportedStems) {
         return;
     }
     for (int stemIdx = 0; stemIdx < mixxx::kMaxSupportedStems; stemIdx++) {
         m_stemGain[stemIdx]->set(deckToClone->m_stemGain[stemIdx]->get());
         m_stemMute[stemIdx]->set(deckToClone->m_stemMute[stemIdx]->get());
+        m_stemPfl[stemIdx]->set(deckToClone->m_stemPfl[stemIdx]->get());
     }
     m_stemClonedState = true;
 }
@@ -272,6 +344,14 @@ void EngineDeck::process(CSAMPLE* pOut, const std::size_t bufferSize) {
 
     // Update VU meter
     m_vuMeter.process(pOut, bufferSize);
+
+#ifdef __STEM__
+    if (m_hasStemPfl) {
+        SampleUtil::copy(m_headphoneBuffer.data(), pOut, bufferSize);
+        m_pPregain->processSecondary(m_cuedStemsMixBuffer.data(), bufferSize);
+        SampleUtil::add(m_headphoneBuffer.data(), m_cuedStemsMixBuffer.data(), bufferSize);
+    }
+#endif
 }
 
 void EngineDeck::collectFeatures(GroupFeatureState* pGroupFeatures) const {
@@ -309,6 +389,10 @@ EngineChannel::ActiveState EngineDeck::updateActiveState() {
 #ifdef __STEM__
         for (auto& stemVuMeter : m_stemVuMeter) {
             stemVuMeter->reset();
+        }
+        m_hasStemPfl = false;
+        for (auto& pflGain : m_stemsPflGainCache) {
+            pflGain = CSAMPLE_GAIN_ZERO;
         }
 #endif
         m_active = false;
@@ -376,5 +460,16 @@ void EngineDeck::slotPassthroughChangeRequest(double v) {
 QString EngineDeck::getGroupForStem(QStringView deckGroup, int stemIdx) {
     DEBUG_ASSERT(deckGroup.endsWith(QChar(']')) && stemIdx < 4);
     return deckGroup.chopped(1) + QStringLiteral("_Stem") + QChar('1' + stemIdx) + QChar(']');
+}
+
+CSAMPLE* EngineDeck::getHeadphoneBuffer() {
+    if (m_hasStemPfl) {
+        return m_headphoneBuffer.data();
+    }
+    return nullptr;
+}
+#else
+CSAMPLE* EngineDeck::getHeadphoneBuffer() {
+    return nullptr;
 }
 #endif

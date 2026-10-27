@@ -126,6 +126,16 @@ class EngineMixer : public QObject, public AudioSource {
         std::unique_ptr<ControlPushButton> m_pMuteControl;
         GroupFeatureState m_features;
         int m_index;
+
+        CSAMPLE* getHeadphoneBuffer() {
+            if (m_pChannel) {
+                CSAMPLE* pHeadphoneBuffer = m_pChannel->getHeadphoneBuffer();
+                if (pHeadphoneBuffer != nullptr) {
+                    return pHeadphoneBuffer;
+                }
+            }
+            return m_pBuffer.data();
+        }
     };
 
     struct GainCache {

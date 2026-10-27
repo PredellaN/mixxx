@@ -198,7 +198,11 @@ ControlPickerMenu::ControlPickerMenu(QWidget* pParent)
     addDeckAndSamplerControl("pfl",
             tr("Headphone Listen"),
             tr("Headphone listen (pfl) button"),
-            pMixerMenu);
+            pMixerMenu,
+#ifdef __STEM__
+            true,
+#endif
+            false);
 
     addSeparator();
 

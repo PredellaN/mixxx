@@ -24,6 +24,7 @@ class EnginePregain : public EngineObject {
     void setSpeedAndScratching(double speed, bool scratching);
 
     void process(CSAMPLE* pInOut, const std::size_t bufferSize) override;
+    void processSecondary(CSAMPLE* pBuffer, const std::size_t bufferSize);
 
     void collectFeatures(GroupFeatureState* pGroupFeatures) const override;
 
@@ -33,6 +34,9 @@ class EnginePregain : public EngineObject {
     double m_dNonScratchSpeed;
     bool m_scratching;
     CSAMPLE_GAIN m_fPrevGain;
+    CSAMPLE_GAIN m_fLastRampedOldGain;
+    CSAMPLE_GAIN m_fLastRampedNewGain;
+    bool m_bDirectionChangedScratching;
     ControlAudioTaperPot* m_pPotmeterPregain;
     ControlObject* m_pTotalGain;
     ControlObject* m_pCOReplayGain;

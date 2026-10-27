@@ -1992,7 +1992,7 @@ declare namespace MixxxControls {
         /**
          * Toggles headphone cueing (PFL).
          *
-         * @groups [ChannelN], [PreviewDeckN], [SamplerN]
+         * @groups [ChannelN], [ChannelN_StemM], [PreviewDeckN], [SamplerN]
          * @range binary
          * @feedback Headphone button
          */

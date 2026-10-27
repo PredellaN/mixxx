@@ -28,6 +28,9 @@ EnginePregain::EnginePregain(const QString& group)
           m_dNonScratchSpeed(1.0),
           m_scratching(false),
           m_fPrevGain(1.0),
+          m_fLastRampedOldGain(1.0),
+          m_fLastRampedNewGain(1.0),
+          m_bDirectionChangedScratching(false),
           m_bSmoothFade(false) {
     m_pPotmeterPregain = new ControlAudioTaperPot(ConfigKey(group, "pregain"), -12, 12, 0.5);
     //Replay Gain things
@@ -146,7 +149,10 @@ void EnginePregain::process(CSAMPLE* pInOut, const std::size_t bufferSize) {
     }
     totalGain *= static_cast<CSAMPLE_GAIN>(speedGain);
 
-    if ((m_dSpeed * m_dOldSpeed < 0) && m_scratching) {
+    CSAMPLE_GAIN oldGain = m_fPrevGain;
+    bool directionChangedScratching = (m_dSpeed * m_dOldSpeed < 0) && m_scratching;
+
+    if (directionChangedScratching) {
         // direction changed, go though zero if scratching
         SampleUtil::applyRampingGain(&pInOut[0], m_fPrevGain, 0, bufferSize / 2);
         SampleUtil::applyRampingGain(&pInOut[bufferSize / 2], 0, totalGain, bufferSize / 2);
@@ -159,7 +165,25 @@ void EnginePregain::process(CSAMPLE* pInOut, const std::size_t bufferSize) {
         // SampleUtil deals with aliased buffers and gains of 1 or 0.
         SampleUtil::applyGain(pInOut, totalGain, bufferSize);
     }
+    m_fLastRampedOldGain = oldGain;
+    m_fLastRampedNewGain = totalGain;
+    m_bDirectionChangedScratching = directionChangedScratching;
     m_fPrevGain = totalGain;
+}
+
+void EnginePregain::processSecondary(CSAMPLE* pBuffer, const std::size_t bufferSize) {
+    if (m_bDirectionChangedScratching) {
+        SampleUtil::applyRampingGain(&pBuffer[0], m_fLastRampedOldGain, 0, bufferSize / 2);
+        SampleUtil::applyRampingGain(&pBuffer[bufferSize / 2],
+                0,
+                m_fLastRampedNewGain,
+                bufferSize / 2);
+    } else if (m_fLastRampedOldGain == m_fLastRampedNewGain) {
+        SampleUtil::applyGain(pBuffer, m_fLastRampedNewGain, bufferSize);
+    } else {
+        SampleUtil::applyRampingGain(
+                pBuffer, m_fLastRampedOldGain, m_fLastRampedNewGain, bufferSize);
+    }
 }
 
 void EnginePregain::collectFeatures(GroupFeatureState* pGroupFeatures) const {

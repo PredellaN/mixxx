@@ -65,6 +65,8 @@ class EngineDeck : public EngineChannel, public AudioDestination {
     // Return whether or not passthrough is active
     bool isPassthroughActive() const;
 
+    CSAMPLE* getHeadphoneBuffer() override;
+
 #ifdef __STEM__
     // Clone the stem state (gain and volume) from deckToClone to this. Doesn't
     // check if the loaded track is a stem so this should only be used in case
@@ -100,11 +102,17 @@ class EngineDeck : public EngineChannel, public AudioDestination {
 #ifdef __STEM__
     // Stem buffer used to retrieve all the channel to mix together
     mixxx::SampleBuffer m_stemBuffer;
+    mixxx::SampleBuffer m_headphoneBuffer;
+    mixxx::SampleBuffer m_cuedStemBuffer;
+    mixxx::SampleBuffer m_cuedStemsMixBuffer;
     std::unique_ptr<ControlObject> m_pStemCount;
     std::vector<std::unique_ptr<ControlPotmeter>> m_stemGain;
     std::vector<std::unique_ptr<ControlPushButton>> m_stemMute;
+    std::vector<std::unique_ptr<ControlPushButton>> m_stemPfl;
+    std::vector<CSAMPLE_GAIN> m_stemsPflGainCache;
     std::vector<std::unique_ptr<EngineVuMeter>> m_stemVuMeter;
     bool m_stemClonedState;
+    bool m_hasStemPfl;
 #endif
 
     // Begin vinyl passthrough fields

@@ -41,8 +41,7 @@ class StemControlFixture : public BaseSignalPathTest,
     }
     QString GetStemFilePath() {
         const auto& [codec, info] = GetParam();
-        return getTestDir().filePath(getTestDir()
-                        .filePath("stems/%1/%2_%3.stem.mp4")
+        return getTestDir().filePath(QStringLiteral("stems/%1/%2_%3.stem.mp4")
                         .arg(info.dir,
                                 info.title,
                                 QString::fromStdString(codec)));
@@ -121,6 +120,12 @@ class StemControlFixture : public BaseSignalPathTest,
         m_pStem4VuMeter = std::make_unique<PollingControlProxy>(
                 getGroupForStem(m_sGroup1, 4), "vu_meter");
 
+        m_pStem1Pfl = std::make_unique<PollingControlProxy>(getGroupForStem(m_sGroup1, 1), "pfl");
+        m_pStem2Pfl = std::make_unique<PollingControlProxy>(getGroupForStem(m_sGroup1, 2), "pfl");
+        m_pStem3Pfl = std::make_unique<PollingControlProxy>(getGroupForStem(m_sGroup1, 3), "pfl");
+        m_pStem4Pfl = std::make_unique<PollingControlProxy>(getGroupForStem(m_sGroup1, 4), "pfl");
+        m_pDeck1Pfl = std::make_unique<PollingControlProxy>(m_sGroup1, "pfl");
+
         m_pStemCount = std::make_unique<PollingControlProxy>(m_sGroup1, "stem_count");
     }
 
@@ -181,6 +186,11 @@ class StemControlFixture : public BaseSignalPathTest,
     std::unique_ptr<PollingControlProxy> m_pStem2VuMeter;
     std::unique_ptr<PollingControlProxy> m_pStem3VuMeter;
     std::unique_ptr<PollingControlProxy> m_pStem4VuMeter;
+    std::unique_ptr<PollingControlProxy> m_pStem1Pfl;
+    std::unique_ptr<PollingControlProxy> m_pStem2Pfl;
+    std::unique_ptr<PollingControlProxy> m_pStem3Pfl;
+    std::unique_ptr<PollingControlProxy> m_pStem4Pfl;
+    std::unique_ptr<PollingControlProxy> m_pDeck1Pfl;
     std::unique_ptr<PollingControlProxy> m_pStemCount;
 };
 
@@ -194,8 +204,7 @@ TEST_P(StemControlFixture, StemCount) {
     EXPECT_EQ(m_pStemCount->get(), 0.0);
 
     auto sourceStemPath = GetStemFilePath();
-    kTrackLocationTest = getTestDir().filePath(sourceStemPath);
-    pTrack = Track::newTemporary(kTrackLocationTest);
+    pTrack = Track::newTemporary(sourceStemPath);
     loadTrack(m_pMixerDeck1.get(), pTrack);
 
     EXPECT_EQ(m_pStemCount->get(), 4.0);
@@ -217,8 +226,7 @@ TEST_P(StemControlFixture, StemColor) {
     EXPECT_EQ(m_pStem3Color->get(), -1.0);
     EXPECT_EQ(m_pStem4Color->get(), -1.0);
 
-    kTrackLocationTest = getTestDir().filePath(sourceStemPath);
-    pTrack = Track::newTemporary(kTrackLocationTest);
+    pTrack = Track::newTemporary(sourceStemPath);
     loadTrack(m_pMixerDeck1.get(), pTrack);
 
     EXPECT_EQ(m_pStem1Color->get(), 0xfd << 16 | 0x4a << 8 | 0x4a);
@@ -398,6 +406,159 @@ TEST_P(StemControlFixture, VuMeter) {
 
     // Stem 2 should still be playing
     EXPECT_GT(m_pStem2VuMeter->get(), 0.0);
+}
+
+TEST_P(StemControlFixture, PflRouting) {
+    m_pChannel1->getEngineBuffer()->queueNewPlaypos(
+            mixxx::audio::FramePos{0}, EngineBuffer::SEEK_STANDARD);
+    m_pPlay->set(1.0);
+
+    m_pStem1Mute->set(1.0);
+    m_pStem2Mute->set(1.0);
+    m_pStem3Mute->set(1.0);
+    m_pStem4Mute->set(1.0);
+
+    m_pDeck1Pfl->set(1.0);
+    m_pStem1Pfl->set(0.0);
+    m_pStem2Pfl->set(0.0);
+    m_pStem3Pfl->set(0.0);
+    m_pStem4Pfl->set(0.0);
+
+    m_pEngineMixer->process(kProcessBufferSize);
+    m_pEngineMixer->process(kProcessBufferSize);
+
+    assertBufferMatchesReference(m_pEngineMixer->getMainBuffer(),
+            QStringLiteral("StemVolumeControlSilence"));
+
+    auto headphoneBuffer = m_pEngineMixer->getHeadphoneBuffer();
+    bool headphoneIsSilent = true;
+    for (const auto& sample : headphoneBuffer) {
+        if (std::abs(sample) > 0.0001f) {
+            headphoneIsSilent = false;
+            break;
+        }
+    }
+    EXPECT_TRUE(headphoneIsSilent);
+
+    m_pChannel1->getEngineBuffer()->queueNewPlaypos(
+            mixxx::audio::FramePos{0}, EngineBuffer::SEEK_STANDARD);
+    m_pStem1Pfl->set(1.0);
+
+    m_pEngineMixer->process(kProcessBufferSize);
+    m_pEngineMixer->process(kProcessBufferSize);
+
+    assertBufferMatchesReference(m_pEngineMixer->getMainBuffer(),
+            QStringLiteral("StemVolumeControlSilence"));
+
+    headphoneBuffer = m_pEngineMixer->getHeadphoneBuffer();
+    bool headphoneHasAudio = false;
+    for (const auto& sample : headphoneBuffer) {
+        if (std::abs(sample) > 0.01f) {
+            headphoneHasAudio = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(headphoneHasAudio);
+
+    m_pDeck1Pfl->set(0.0);
+    m_pEngineMixer->process(kProcessBufferSize);
+    m_pEngineMixer->process(kProcessBufferSize);
+
+    headphoneBuffer = m_pEngineMixer->getHeadphoneBuffer();
+    headphoneIsSilent = true;
+    for (const auto& sample : headphoneBuffer) {
+        if (std::abs(sample) > 0.0001f) {
+            headphoneIsSilent = false;
+            break;
+        }
+    }
+    EXPECT_TRUE(headphoneIsSilent);
+
+    m_pDeck1Pfl->set(1.0);
+    m_pStem1Pfl->set(0.0);
+    m_pEngineMixer->process(kProcessBufferSize);
+    m_pEngineMixer->process(kProcessBufferSize);
+
+    headphoneBuffer = m_pEngineMixer->getHeadphoneBuffer();
+    headphoneIsSilent = true;
+    for (const auto& sample : headphoneBuffer) {
+        if (std::abs(sample) > 0.0001f) {
+            headphoneIsSilent = false;
+            break;
+        }
+    }
+    EXPECT_TRUE(headphoneIsSilent);
+
+    m_pStem1Mute->set(0.0);
+    m_pStem1Volume->set(0.0);
+    m_pStem1Pfl->set(1.0);
+    m_pChannel1->getEngineBuffer()->queueNewPlaypos(
+            mixxx::audio::FramePos{0}, EngineBuffer::SEEK_STANDARD);
+    m_pEngineMixer->process(kProcessBufferSize);
+    m_pEngineMixer->process(kProcessBufferSize);
+
+    assertBufferMatchesReference(m_pEngineMixer->getMainBuffer(),
+            QStringLiteral("StemVolumeControlSilence"));
+
+    headphoneBuffer = m_pEngineMixer->getHeadphoneBuffer();
+    headphoneHasAudio = false;
+    for (const auto& sample : headphoneBuffer) {
+        if (std::abs(sample) > 0.01f) {
+            headphoneHasAudio = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(headphoneHasAudio);
+}
+
+TEST_P(StemControlFixture, PflResetOnLoad) {
+    m_pStem1Pfl->set(1.0);
+    m_pStem2Pfl->set(1.0);
+    m_pStem3Pfl->set(0.0);
+    m_pStem4Pfl->set(1.0);
+    m_pConfig->setValue(
+            ConfigKey("[Mixer Profile]", "stem_auto_reset"), false);
+
+    QString kTrackLocationTest = getTestDir().filePath(QStringLiteral("sine-30.wav"));
+    TrackPointer pTrack(Track::newTemporary(kTrackLocationTest));
+    loadTrack(m_pMixerDeck1.get(), pTrack);
+
+    EXPECT_EQ(m_pStem1Pfl->get(), 1.0);
+    EXPECT_EQ(m_pStem2Pfl->get(), 1.0);
+    EXPECT_EQ(m_pStem3Pfl->get(), 0.0);
+    EXPECT_EQ(m_pStem4Pfl->get(), 1.0);
+
+    m_pConfig->setValue(
+            ConfigKey("[Mixer Profile]", "stem_auto_reset"), true);
+    loadTrack(m_pMixerDeck1.get(), pTrack);
+
+    EXPECT_EQ(m_pStem1Pfl->get(), 0.0);
+    EXPECT_EQ(m_pStem2Pfl->get(), 0.0);
+    EXPECT_EQ(m_pStem3Pfl->get(), 0.0);
+    EXPECT_EQ(m_pStem4Pfl->get(), 0.0);
+}
+
+TEST_P(StemControlFixture, PflCloning) {
+    m_pStem1Pfl->set(1.0);
+    m_pStem2Pfl->set(0.0);
+    m_pStem3Pfl->set(1.0);
+    m_pStem4Pfl->set(0.0);
+
+    m_pChannel2->cloneStemState(m_pChannel1);
+
+    auto pStem1Deck2Pfl = std::make_unique<PollingControlProxy>(
+            getGroupForStem(m_sGroup2, 1), "pfl");
+    auto pStem2Deck2Pfl = std::make_unique<PollingControlProxy>(
+            getGroupForStem(m_sGroup2, 2), "pfl");
+    auto pStem3Deck2Pfl = std::make_unique<PollingControlProxy>(
+            getGroupForStem(m_sGroup2, 3), "pfl");
+    auto pStem4Deck2Pfl = std::make_unique<PollingControlProxy>(
+            getGroupForStem(m_sGroup2, 4), "pfl");
+
+    EXPECT_EQ(pStem1Deck2Pfl->get(), 1.0);
+    EXPECT_EQ(pStem2Deck2Pfl->get(), 0.0);
+    EXPECT_EQ(pStem3Deck2Pfl->get(), 1.0);
+    EXPECT_EQ(pStem4Deck2Pfl->get(), 0.0);
 }
 
 INSTANTIATE_TEST_SUITE_P(
