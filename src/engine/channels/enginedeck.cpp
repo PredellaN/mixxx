@@ -83,7 +83,7 @@ EngineDeck::EngineDeck(
         m_stemMute.push_back(std::move(pMuteButton));
 
         m_stemVuMeter.emplace_back(std::make_unique<EngineVuMeter>(
-                getGroupForStem(getGroup(), stemIdx), QString(), false));
+                getGroupForStem(getGroup(), stemIdx)));
     }
 #endif
 }
@@ -106,8 +106,14 @@ void EngineDeck::slotTrackLoaded(TrackPointer pNewTrack,
     if (pNewTrack) {
         int stemCount = pNewTrack->getStemInfo().size();
         m_pStemCount->forceSet(stemCount);
+        for (int stemIdx = stemCount; stemIdx < mixxx::kMaxSupportedStems; ++stemIdx) {
+            m_stemVuMeter[stemIdx]->reset();
+        }
     } else {
         m_pStemCount->forceSet(0);
+        for (auto& stemVuMeter : m_stemVuMeter) {
+            stemVuMeter->reset();
+        }
     }
 }
 #endif
@@ -153,6 +159,9 @@ void EngineDeck::processStem(CSAMPLE* pOut, const std::size_t bufferSize) {
         // If we don't have an engine manager to mix the stem together, we mixed
         // the multi channel into stereo and return early.
         SampleUtil::mixMultichannelToStereo(pOut, pIn, numFrames, chCount);
+        for (auto& stemVuMeter : m_stemVuMeter) {
+            stemVuMeter->reset();
+        }
         return;
     }
 
@@ -198,6 +207,10 @@ void EngineDeck::processStem(CSAMPLE* pOut, const std::size_t bufferSize) {
                 numFrames,
                 chCount,
                 chOffset);
+    }
+
+    for (std::size_t stemIdx = stemCount; stemIdx < m_stemVuMeter.size(); ++stemIdx) {
+        m_stemVuMeter[stemIdx]->reset();
     }
 
     // Mixxx all the stem tracks together
