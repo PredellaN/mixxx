@@ -69,6 +69,7 @@ EngineDeck::EngineDeck(
 
     m_stemGain.reserve(mixxx::kMaxSupportedStems);
     m_stemMute.reserve(mixxx::kMaxSupportedStems);
+    m_stemVuMeter.reserve(mixxx::kMaxSupportedStems);
     for (int stemIdx = 0; stemIdx < mixxx::kMaxSupportedStems; stemIdx++) {
         m_stemGain.emplace_back(std::make_unique<ControlPotmeter>(
                 ConfigKey(getGroupForStem(getGroup(), stemIdx), QStringLiteral("volume"))));
@@ -81,6 +82,9 @@ EngineDeck::EngineDeck(
                 ConfigKey(getGroupForStem(getGroup(), stemIdx), QStringLiteral("mute")));
         pMuteButton->setButtonMode(mixxx::control::ButtonMode::PowerWindow);
         m_stemMute.push_back(std::move(pMuteButton));
+
+        m_stemVuMeter.emplace_back(std::make_unique<EngineVuMeter>(
+                getGroupForStem(getGroup(), stemIdx)));
     }
 #endif
 }
@@ -103,8 +107,14 @@ void EngineDeck::slotTrackLoaded(TrackPointer pNewTrack,
     if (pNewTrack) {
         int stemCount = pNewTrack->getStemInfo().size();
         m_pStemCount->forceSet(stemCount);
+        for (int stemIdx = stemCount; stemIdx < mixxx::kMaxSupportedStems; ++stemIdx) {
+            m_stemVuMeter[stemIdx]->reset();
+        }
     } else {
         m_pStemCount->forceSet(0);
+        for (auto& stemVuMeter : m_stemVuMeter) {
+            stemVuMeter->reset();
+        }
     }
 }
 #endif
@@ -128,7 +138,8 @@ void EngineDeck::processStem(CSAMPLE* pOut, const std::size_t bufferSize) {
     mixxx::audio::ChannelCount chCount = m_pBuffer->getChannelCount();
     unsigned int stemCount = chCount / mixxx::kEngineChannelOutputCount;
     VERIFY_OR_DEBUG_ASSERT(stemCount <= m_stems.size() &&
-            stemCount <= m_stemMute.size() && stemCount <= m_stemGain.size()) {
+            stemCount <= m_stemMute.size() && stemCount <= m_stemGain.size() &&
+            stemCount <= m_stemVuMeter.size()) {
         // Cannot mix the stems without their controls, output silence.
         m_activeStemCount = 0;
         SampleUtil::clear(pOut, bufferSize);
@@ -178,6 +189,8 @@ void EngineDeck::processStem(CSAMPLE* pOut, const std::size_t bufferSize) {
         // next iteration. Without this, (e.g using a static "previous"
         // gain) gain changes will yield to audio cracks.
         m_stemsGainCache[stemIdx] = stemGain;
+        m_stemVuMeter[stemIdx]->process(pOut, bufferSize);
+
         // Put back the stem frames into the steam buffer (LRLR -> LR......LR......)
         SampleUtil::insertStereoToMulti(
                 pIn,
@@ -185,6 +198,10 @@ void EngineDeck::processStem(CSAMPLE* pOut, const std::size_t bufferSize) {
                 numFrames,
                 chCount,
                 chOffset);
+    }
+
+    for (std::size_t stemIdx = stemCount; stemIdx < m_stemVuMeter.size(); ++stemIdx) {
+        m_stemVuMeter[stemIdx]->reset();
     }
 
     // Mixxx all the stem tracks together into the dry deck output. This is
@@ -339,6 +356,11 @@ EngineChannel::ActiveState EngineDeck::updateActiveState() {
     }
     if (m_active) {
         m_vuMeter.reset();
+#ifdef __STEM__
+        for (auto& stemVuMeter : m_stemVuMeter) {
+            stemVuMeter->reset();
+        }
+#endif
         m_active = false;
         return ActiveState::WasActive;
     }

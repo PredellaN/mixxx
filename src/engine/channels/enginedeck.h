@@ -112,6 +112,7 @@ class EngineDeck : public EngineChannel, public AudioDestination {
     std::unique_ptr<ControlObject> m_pStemCount;
     std::vector<std::unique_ptr<ControlPotmeter>> m_stemGain;
     std::vector<std::unique_ptr<ControlPushButton>> m_stemMute;
+    std::vector<std::unique_ptr<EngineVuMeter>> m_stemVuMeter;
     bool m_stemClonedState;
     // Number of stems prepared by processStem() for ChannelMixer in the current
     // engine callback. Reset to 0 at the beginning of process(), so that
