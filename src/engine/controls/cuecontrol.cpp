@@ -99,6 +99,17 @@ CueControl::CueControl(const QString& group,
             this, &CueControl::quantizeChanged,
             Qt::DirectConnection);
 
+    m_pQuantizeResolution = ControlObject::getControl(
+            ConfigKey(group, "quantize_resolution"),
+            ControlFlag::NoAssertIfMissing);
+    if (m_pQuantizeResolution) {
+        connect(m_pQuantizeResolution,
+                &ControlObject::valueChanged,
+                this,
+                &CueControl::quantizeChanged,
+                Qt::DirectConnection);
+    }
+
     m_pClosestBeat = ControlObject::getControl(ConfigKey(group, "beat_closest"));
     m_pLoopStartPosition = make_parented<ControlProxy>(group, "loop_start_position", this);
     m_pLoopEndPosition = make_parented<ControlProxy>(group, "loop_end_position", this);
@@ -2273,6 +2284,16 @@ CueControl::TrackAt CueControl::getTrackAt() const {
     return TrackAt::ElseWhere;
 }
 
+double CueControl::quantizeResolution() const {
+    if (m_pQuantizeResolution) {
+        double res = m_pQuantizeResolution->get();
+        if (res > 0.0) {
+            return res;
+        }
+    }
+    return 1.0;
+}
+
 mixxx::audio::FramePos CueControl::getQuantizedCurrentPosition() {
     FrameInfo info = frameInfo();
 
@@ -2283,6 +2304,19 @@ mixxx::audio::FramePos CueControl::getQuantizedCurrentPosition() {
     // Don't quantize if quantization is disabled.
     if (!m_pQuantizeEnabled->toBool()) {
         return info.currentPosition;
+    }
+
+    const double resolution = quantizeResolution();
+    if (resolution < 1.0 && m_pLoadedTrack) {
+        const mixxx::BeatsPointer pBeats = m_pLoadedTrack->getBeats();
+        if (pBeats) {
+            const auto quantized = pBeats->findClosestBeatFraction(
+                    info.currentPosition, resolution);
+            if (quantized.isValid() && info.trackEndPosition.isValid() &&
+                    quantized <= info.trackEndPosition) {
+                return quantized;
+            }
+        }
     }
 
     const auto closestBeat =
@@ -2330,7 +2364,8 @@ mixxx::audio::FramePos CueControl::quantizeCuePoint(mixxx::audio::FramePos posit
         return position;
     }
 
-    const auto quantizedPosition = pBeats->findClosestBeat(position);
+    const auto quantizedPosition = pBeats->findClosestBeatFraction(
+            position, quantizeResolution());
     // The closest beat can be an unreachable interpolated beat past the end of
     // the track.
     if (quantizedPosition.isValid() && quantizedPosition <= trackEndPosition) {

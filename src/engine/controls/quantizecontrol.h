@@ -29,6 +29,7 @@ class QuantizeControl : public EngineControl {
     void playPosChanged(mixxx::audio::FramePos position);
 
     ControlPushButton* m_pCOQuantizeEnabled;
+    ControlObject* m_pCOQuantizeResolution;
     ControlObject* m_pCONextBeat;
     ControlObject* m_pCOPrevBeat;
     ControlObject* m_pCOClosestBeat;

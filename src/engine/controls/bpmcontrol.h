@@ -134,6 +134,7 @@ class BpmControl : public EngineControl {
     PollingControlProxy m_reverseButton;
     std::unique_ptr<ControlProxy> m_pRateRatio;
     PollingControlProxy m_quantize;
+    PollingControlProxy m_quantizeResolution;
 
     // ControlObjects that come from QuantizeControl
     PollingControlProxy m_nextBeat;

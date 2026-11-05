@@ -12,6 +12,13 @@ QuantizeControl::QuantizeControl(const QString& group,
         : EngineControl(group, pConfig) {
     m_pCOQuantizeEnabled = new ControlPushButton(ConfigKey(group, "quantize"), true, 1.0);
     m_pCOQuantizeEnabled->setButtonMode(mixxx::control::ButtonMode::Toggle);
+
+    const double defaultResolution = pConfig
+            ? pConfig->getValue(ConfigKey("[Controls]", "QuantizeResolution"), 1.0)
+            : 1.0;
+    m_pCOQuantizeResolution = new ControlObject(ConfigKey(group, "quantize_resolution"));
+    m_pCOQuantizeResolution->set(defaultResolution > 0.0 ? defaultResolution : 1.0);
+
     m_pCONextBeat = new ControlObject(ConfigKey(group, "beat_next"));
     m_pCONextBeat->setKbdRepeatable(true);
     m_pCONextBeat->set(mixxx::audio::kInvalidFramePos.toEngineSamplePosMaybeInvalid());
@@ -24,6 +31,7 @@ QuantizeControl::QuantizeControl(const QString& group,
 
 QuantizeControl::~QuantizeControl() {
     delete m_pCOQuantizeEnabled;
+    delete m_pCOQuantizeResolution;
     delete m_pCONextBeat;
     delete m_pCOPrevBeat;
     delete m_pCOClosestBeat;

@@ -123,6 +123,9 @@ LoopingControl::LoopingControl(const QString& group,
             Qt::DirectConnection);
 
     m_pQuantizeEnabled = ControlObject::getControl(ConfigKey(group, "quantize"));
+    m_pQuantizeResolution = ControlObject::getControl(
+            ConfigKey(group, "quantize_resolution"),
+            ControlFlag::NoAssertIfMissing);
     m_pSlipEnabled = ControlObject::getControl(ConfigKey(group, "slip_enabled"));
 
     // DEPRECATED: Use beatloop_size and beatloop_set instead.
@@ -734,10 +737,8 @@ void LoopingControl::setLoopInToCurrentPosition() {
         mixxx::audio::FramePos nextBeatPosition;
         if (pBeats->findPrevNextBeats(position, &prevBeatPosition, &nextBeatPosition, false)) {
             // both beat positions are valid
-            mixxx::audio::FramePos closestBeatPosition =
-                    (nextBeatPosition - position > position - prevBeatPosition)
-                    ? prevBeatPosition
-                    : nextBeatPosition;
+            const mixxx::audio::FramePos closestBeatPosition =
+                    pBeats->findClosestBeatFraction(position, quantizeResolution());
             quantizedBeatPosition =
                     (closestBeatPosition > info.trackEndPosition)
                     ? prevBeatPosition
@@ -876,9 +877,7 @@ void LoopingControl::setLoopOutToCurrentPosition() {
         if (pBeats->findPrevNextBeats(position, &prevBeatPosition, &nextBeatPosition, false)) {
             // both beat positions are valid
             const mixxx::audio::FramePos closestBeatPosition =
-                    (nextBeatPosition - position > position - prevBeatPosition)
-                    ? prevBeatPosition
-                    : nextBeatPosition;
+                    pBeats->findClosestBeatFraction(position, quantizeResolution());
             quantizedBeatPosition =
                     (closestBeatPosition > info.trackEndPosition)
                     ? prevBeatPosition
@@ -1451,6 +1450,16 @@ bool LoopingControl::quantizeEnabledAndHasTrueTrackBeats() const {
     return m_pQuantizeEnabled->toBool() && m_trueTrackBeats;
 }
 
+double LoopingControl::quantizeResolution() const {
+    if (m_pQuantizeResolution) {
+        double res = m_pQuantizeResolution->get();
+        if (res > 0.0) {
+            return res;
+        }
+    }
+    return 1.0;
+}
+
 double LoopingControl::findBeatloopSizeForLoop(
         mixxx::audio::FramePos startPosition,
         mixxx::audio::FramePos endPosition) const {
@@ -1504,8 +1513,8 @@ mixxx::audio::FramePos LoopingControl::findQuantizedBeatloopStart(
     }
 
     const mixxx::audio::FrameDiff_t beatLength = nextBeatPosition - prevBeatPosition;
-    double loopLength = beatLength * beats;
-    if (beats >= 1.0) {
+    const double resolution = quantizeResolution();
+    if (beats >= 1.0 && resolution >= 1.0) {
         const mixxx::audio::FramePos closestBeatPosition =
                 (nextBeatPosition - currentPosition >
                         currentPosition - prevBeatPosition)
@@ -1514,24 +1523,26 @@ mixxx::audio::FramePos LoopingControl::findQuantizedBeatloopStart(
         return closestBeatPosition;
     }
 
-    // In case of beat length less then 1 beat:
+    // In case of beat length or quantize resolution less than 1 beat:
     // (| - beats, ^ - current track's position):
     //
     // ...|...................^........|...
     //
     // If we press 1/2 beatloop we want loop from 50% to 100%,
     // If I press 1/4 beatloop, we want loop from 50% to 75% etc
+    const double effectiveStep = std::min(beats, resolution);
+    const double stepLength = beatLength * effectiveStep;
     const mixxx::audio::FrameDiff_t framesSinceLastBeat =
             currentPosition - prevBeatPosition;
     // find the previous beat fraction and check if the current position is closer to this or the next one
     // place the new loop start to the closer one
     const mixxx::audio::FramePos previousFractionBeatPosition =
-            prevBeatPosition + floor(framesSinceLastBeat / loopLength) * loopLength;
+            prevBeatPosition + floor(framesSinceLastBeat / stepLength) * stepLength;
     double framesSinceLastFractionBeatPosition = currentPosition - previousFractionBeatPosition;
-    if (framesSinceLastFractionBeatPosition <= (loopLength / 2.0)) {
+    if (framesSinceLastFractionBeatPosition <= (stepLength / 2.0)) {
         return previousFractionBeatPosition;
     }
-    return previousFractionBeatPosition + loopLength;
+    return previousFractionBeatPosition + stepLength;
 }
 
 void LoopingControl::slotBeatLoop(double beats,

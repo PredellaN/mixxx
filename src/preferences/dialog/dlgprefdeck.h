@@ -75,6 +75,7 @@ class DlgPrefDeck : public DlgPreferencePage, public Ui::DlgPrefDeckDlg  {
     void slotSetTrackLoadMode(int comboboxIndex);
     void slotLoadWhenDeckPlayingIndexChanged(int comboboxIndex);
     void slotCloneDeckOnLoadDoubleTapCheckbox(bool);
+    void slotQuantizeResolutionIndexChanged(int comboboxIndex);
     void slotRateRampingModeLinearButton(bool);
     void slotRateRampSensitivitySlider(int);
 
@@ -95,6 +96,7 @@ class DlgPrefDeck : public DlgPreferencePage, public Ui::DlgPrefDeckDlg  {
 
     void setRateRangeForAllDecks(int rangePercent);
     void setRateDirectionForAllDecks(bool inverted);
+    void setQuantizeResolutionForAllDecks(double resolution);
 
     const UserSettingsPointer m_pConfig;
 
@@ -105,6 +107,7 @@ class DlgPrefDeck : public DlgPreferencePage, public Ui::DlgPrefDeckDlg  {
     const parented_ptr<ControlProxy> m_pNumSamplers;
 
     QList<ControlProxy*> m_cueControls;
+    QList<ControlProxy*> m_quantizeResolutionControls;
     QList<ControlProxy*> m_rateControls;
     QList<ControlProxy*> m_rateDirectionControls;
     QList<ControlProxy*> m_rateRangeControls;
@@ -137,4 +140,5 @@ class DlgPrefDeck : public DlgPreferencePage, public Ui::DlgPrefDeckDlg  {
     double m_dRateTempFine;
     double m_dRatePermCoarse;
     double m_dRatePermFine;
+    double m_dQuantizeResolution;
 };
