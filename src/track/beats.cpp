@@ -795,4 +795,39 @@ audio::FramePos Beats::findClosestBeat(audio::FramePos position) const {
             : nextBeatPosition;
 }
 
+audio::FramePos Beats::findClosestBeatFraction(
+        audio::FramePos position,
+        double beatFraction) const {
+    if (!isValid()) {
+        return audio::kInvalidFramePos;
+    }
+    if (!(beatFraction > 0.0 && beatFraction < 1.0)) {
+        return findClosestBeat(position);
+    }
+    audio::FramePos prevBeatPosition;
+    audio::FramePos nextBeatPosition;
+    findPrevNextBeats(position, &prevBeatPosition, &nextBeatPosition, false);
+    if (!prevBeatPosition.isValid()) {
+        return nextBeatPosition;
+    }
+    if (!nextBeatPosition.isValid()) {
+        return prevBeatPosition;
+    }
+
+    const audio::FrameDiff_t beatLength = nextBeatPosition - prevBeatPosition;
+    if (beatLength <= 0) {
+        return prevBeatPosition;
+    }
+
+    const double step = beatLength * beatFraction;
+    const double numSteps = std::round((position - prevBeatPosition) / step);
+    if (numSteps <= 0) {
+        return prevBeatPosition;
+    }
+    if (numSteps >= std::round(1.0 / beatFraction)) {
+        return nextBeatPosition;
+    }
+    return prevBeatPosition + numSteps * step;
+}
+
 } // namespace mixxx

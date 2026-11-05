@@ -227,6 +227,26 @@ DlgPrefDeck::DlgPrefDeck(QWidget* parent, UserSettingsPointer pConfig)
             this,
             &DlgPrefDeck::slotCloneDeckOnLoadDoubleTapCheckbox);
 
+    comboBoxQuantizeResolution->clear();
+    comboBoxQuantizeResolution->addItem(tr("1 beat"), 1.0);
+    comboBoxQuantizeResolution->addItem(tr("1/2 beat"), 0.5);
+    comboBoxQuantizeResolution->addItem(tr("1/4 beat"), 0.25);
+    comboBoxQuantizeResolution->addItem(tr("1/8 beat"), 0.125);
+    comboBoxQuantizeResolution->addItem(tr("1/16 beat"), 0.0625);
+
+    m_dQuantizeResolution = m_pConfig->getValue(
+            ConfigKey(kControlsGroup, QStringLiteral("QuantizeResolution")), 1.0);
+    int quantizeResIndex = comboBoxQuantizeResolution->findData(m_dQuantizeResolution);
+    if (quantizeResIndex < 0) {
+        quantizeResIndex = 0;
+        m_dQuantizeResolution = 1.0;
+    }
+    comboBoxQuantizeResolution->setCurrentIndex(quantizeResIndex);
+    connect(comboBoxQuantizeResolution,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            &DlgPrefDeck::slotQuantizeResolutionIndexChanged);
+
     m_bRateDownIncreasesSpeed = m_pConfig->getValue(
             ConfigKey(kControlsGroup, QStringLiteral("RateDir")), kDefaultRateDirectionInverted);
     setRateDirectionForAllDecks(m_bRateDownIncreasesSpeed);
@@ -436,6 +456,7 @@ DlgPrefDeck::~DlgPrefDeck() {
     qDeleteAll(m_rateControls);
     qDeleteAll(m_rateDirectionControls);
     qDeleteAll(m_cueControls);
+    qDeleteAll(m_quantizeResolutionControls);
     qDeleteAll(m_rateRangeControls);
     qDeleteAll(m_keylockModeControls);
     qDeleteAll(m_keyunlockModeControls);
@@ -464,6 +485,13 @@ void DlgPrefDeck::slotUpdate() {
     double cueMode = m_cueControls[0]->get();
     index = ComboBoxCueMode->findData(static_cast<int>(cueMode));
     ComboBoxCueMode->setCurrentIndex(index);
+
+    double quantizeResolution = !m_quantizeResolutionControls.isEmpty()
+            ? m_quantizeResolutionControls[0]->get()
+            : m_pConfig->getValue(
+                      ConfigKey(kControlsGroup, QStringLiteral("QuantizeResolution")), 1.0);
+    index = comboBoxQuantizeResolution->findData(quantizeResolution);
+    comboBoxQuantizeResolution->setCurrentIndex(index >= 0 ? index : 0);
 
     const EngineSync::SyncLockAlgorithm syncLockAlgorithm =
             static_cast<EngineSync::SyncLockAlgorithm>(m_pConfig->getValue<int>(
@@ -535,6 +563,10 @@ void DlgPrefDeck::slotResetToDefaults() {
 
     // Clone decks by double-tapping Load button.
     checkBoxCloneDeckOnLoadDoubleTap->setChecked(kDefaultCloneDeckOnLoad);
+
+    // Quantize snapping
+    comboBoxQuantizeResolution->setCurrentIndex(
+            comboBoxQuantizeResolution->findData(1.0));
 
     // Mixxx cue mode
     ComboBoxCueMode->setCurrentIndex(0);
@@ -720,6 +752,10 @@ void DlgPrefDeck::slotApply() {
     m_pConfig->setValue(ConfigKey(kControlsGroup, QStringLiteral("CloneDeckOnLoadDoubleTap")),
             m_bCloneDeckOnLoadDoubleTap);
 
+    m_pConfig->setValue(ConfigKey(kControlsGroup, QStringLiteral("QuantizeResolution")),
+            m_dQuantizeResolution);
+    setQuantizeResolutionForAllDecks(m_dQuantizeResolution);
+
     // Set rate range
     // Set the config value before setting the CO values in setRateRangeForAllDecks()
     // because a proxy in DlgPrefLibrary listens to [Channe1],rate_range changes
@@ -811,6 +847,9 @@ void DlgPrefDeck::slotNumDecksChanged(double new_count, bool initializing) {
                 group, "rate_dir"));
         m_cueControls.push_back(new ControlProxy(
                 group, "cue_mode"));
+        m_quantizeResolutionControls.push_back(new ControlProxy(
+                group, "quantize_resolution"));
+        m_quantizeResolutionControls.last()->set(m_dQuantizeResolution);
         m_keylockModeControls.push_back(new ControlProxy(
                 group, "keylockMode"));
         m_keylockModeControls.last()->set(static_cast<double>(m_keylockMode));
@@ -844,6 +883,9 @@ void DlgPrefDeck::slotNumSamplersChanged(double new_count, bool initializing) {
                 group, "rate_dir"));
         m_cueControls.push_back(new ControlProxy(
                 group, "cue_mode"));
+        m_quantizeResolutionControls.push_back(new ControlProxy(
+                group, "quantize_resolution"));
+        m_quantizeResolutionControls.last()->set(m_dQuantizeResolution);
         m_keylockModeControls.push_back(new ControlProxy(
                 group, "keylockMode"));
         m_keylockModeControls.last()->set(static_cast<double>(m_keylockMode));
@@ -878,4 +920,14 @@ int DlgPrefDeck::cueDefaultIndexByData(int userData) const {
     qWarning() << "No default cue behavior found for value" << userData
                << "returning default";
     return 0;
+}
+
+void DlgPrefDeck::slotQuantizeResolutionIndexChanged(int index) {
+    m_dQuantizeResolution = comboBoxQuantizeResolution->itemData(index).toDouble();
+}
+
+void DlgPrefDeck::setQuantizeResolutionForAllDecks(double resolution) {
+    for (ControlProxy* pControl : std::as_const(m_quantizeResolutionControls)) {
+        pControl->set(resolution);
+    }
 }

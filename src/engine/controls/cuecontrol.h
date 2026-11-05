@@ -298,6 +298,7 @@ class CueControl : public EngineControl {
     void loadCuesFromTrack();
     mixxx::audio::FramePos quantizeCuePoint(mixxx::audio::FramePos position);
     mixxx::audio::FramePos getQuantizedCurrentPosition();
+    double quantizeResolution() const;
     TrackAt getTrackAt() const;
     void seekOnLoad(mixxx::audio::FramePos seekOnLoadPosition);
     void setHotcueFocusIndex(int hotcueIndex);
@@ -314,6 +315,7 @@ class CueControl : public EngineControl {
     ControlObject* m_pPlay;
     ControlObject* m_pStopButton;
     ControlObject* m_pQuantizeEnabled;
+    ControlObject* m_pQuantizeResolution;
     ControlObject* m_pClosestBeat;
     parented_ptr<ControlProxy> m_pLoopStartPosition;
     parented_ptr<ControlProxy> m_pLoopEndPosition;

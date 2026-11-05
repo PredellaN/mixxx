@@ -58,6 +58,9 @@ BpmControl::BpmControl(const QString& group,
         : EngineControl(group, pConfig),
           m_reverseButton(group, QStringLiteral("reverse")),
           m_quantize(group, QStringLiteral("quantize")),
+          m_quantizeResolution(group,
+                  QStringLiteral("quantize_resolution"),
+                  ControlFlag::AllowMissingOrInvalid),
           m_nextBeat(group, QStringLiteral("beat_next")),
           m_prevBeat(group, QStringLiteral("beat_prev")),
           m_loopEnabled(group, QStringLiteral("loop_enabled")),
@@ -1053,14 +1056,25 @@ mixxx::audio::FramePos BpmControl::getBeatMatchPosition(
     // Offset the other deck's user offset, if any.
     otherBeatFraction -= pOtherEngineBuffer->getUserOffset();
 
+    double resolution = 1.0;
+    if (m_quantizeResolution.valid()) {
+        const double res = m_quantizeResolution.get();
+        if (res > 0.0 && res <= 1.0) {
+            resolution = res;
+        }
+    }
+
     // We can either match the past beat with dOtherBeatFraction 1.0
     // or the next beat with dOtherBeatFraction 0.0
     // We prefer the next because this is what will be played,
     // unless we are close to the previous.
     // This happens if the user presses play too late.
-    if (otherBeatFraction > 1.0 - kPastBeatMatchThreshold) {
-        // match the past beat
-        otherBeatFraction -= 1.0;
+    otherBeatFraction = std::fmod(otherBeatFraction, resolution);
+    if (otherBeatFraction < 0.0) {
+        otherBeatFraction += resolution;
+    }
+    if (otherBeatFraction > resolution * (1.0 - kPastBeatMatchThreshold)) {
+        otherBeatFraction -= resolution;
     }
 
     double otherDivSec2 = otherBeatFraction * otherBeatLengthFrames /
@@ -1071,12 +1085,13 @@ mixxx::audio::FramePos BpmControl::getBeatMatchPosition(
     if (thisBeatLengthFrames > 0) {
         // restore phase adjustment
         seekMatch += (thisBeatLengthFrames * m_dUserOffset.getValue());
-        if (thisBeatLengthFrames / 2 < seekMatch) {
-            // seek to previous beat, because of shorter distance
-            seekMatch -= thisBeatLengthFrames;
-        } else if (thisBeatLengthFrames / 2 < -seekMatch) {
-            // seek to beat after next, because of shorter distance
-            seekMatch += thisBeatLengthFrames;
+        const double halfStep = (thisBeatLengthFrames * resolution) / 2.0;
+        if (halfStep < seekMatch) {
+            // seek to previous beat/sub-beat, because of shorter distance
+            seekMatch -= (thisBeatLengthFrames * resolution);
+        } else if (halfStep < -seekMatch) {
+            // seek to beat/sub-beat after next, because of shorter distance
+            seekMatch += (thisBeatLengthFrames * resolution);
         }
     }
     mixxx::audio::FramePos newPlayPosition = thisPosition + seekMatch;

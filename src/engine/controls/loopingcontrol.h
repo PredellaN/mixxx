@@ -174,6 +174,7 @@ class LoopingControl : public EngineControl {
     void updateBeatLoopingControls();
     bool currentLoopMatchesBeatloopSize(const LoopInfo& loopInfo) const;
     bool quantizeEnabledAndHasTrueTrackBeats() const;
+    double quantizeResolution() const;
 
     // Fake beats that allow using looping/beatjump controls with no beats:
     // one 'beat' = one second
@@ -241,6 +242,7 @@ class LoopingControl : public EngineControl {
     LoopInfo m_oldLoopInfo;
     ControlValueAtomic<mixxx::audio::FramePos> m_currentPosition;
     ControlObject* m_pQuantizeEnabled;
+    ControlObject* m_pQuantizeResolution;
     QAtomicPointer<BeatLoopingControl> m_pActiveBeatLoop;
 
     // Base BeatLoop Control Object.

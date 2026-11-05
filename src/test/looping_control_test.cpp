@@ -26,6 +26,9 @@ class LoopingControlTest : public MockedEngineBackendTest {
         MockedEngineBackendTest::SetUp();
         m_pQuantizeEnabled = std::make_unique<PollingControlProxy>(m_sGroup1, "quantize");
         m_pQuantizeEnabled->set(1.0);
+        m_pQuantizeResolution = std::make_unique<PollingControlProxy>(
+                m_sGroup1, "quantize_resolution");
+        m_pQuantizeResolution->set(1.0);
         m_pSlipEnabled = std::make_unique<PollingControlProxy>(m_sGroup1, "slip_enabled");
         m_pNextBeat = std::make_unique<PollingControlProxy>(m_sGroup1, "beat_next");
 
@@ -104,6 +107,7 @@ class LoopingControlTest : public MockedEngineBackendTest {
     std::unique_ptr<PollingControlProxy> m_pNextBeat;
     std::unique_ptr<PollingControlProxy> m_pClosestBeat;
     std::unique_ptr<PollingControlProxy> m_pQuantizeEnabled;
+    std::unique_ptr<PollingControlProxy> m_pQuantizeResolution;
     std::unique_ptr<PollingControlProxy> m_pSlipEnabled;
     std::unique_ptr<PollingControlProxy> m_pTrackSamples;
     std::unique_ptr<PollingControlProxy> m_pButtonLoopIn;
@@ -364,6 +368,28 @@ TEST_F(LoopingControlTest, LoopInOutButtons_QuantizeEnabled) {
     EXPECT_FRAMEPOS_EQ(currentFramePos(), mixxx::audio::FramePos{250});
     EXPECT_EQ(m_pLoopEndPoint->get(), 44100 * 2);
     EXPECT_FALSE(m_pBeatLoop4Enabled->toBool());
+}
+
+TEST_F(LoopingControlTest, LoopInOutButtons_QuantizeResolution_HalfAndQuarterBeat) {
+    const auto bpm = mixxx::Bpm{60};
+    m_pTrack1->trySetBpm(bpm);
+    m_pQuantizeEnabled->set(1);
+
+    // Half beat resolution:
+    // Frame 20000 is closer to half beat (22050) than to 0.
+    m_pQuantizeResolution->set(0.5);
+    setCurrentPosition(mixxx::audio::FramePos{20000});
+    m_pButtonLoopIn->set(1);
+    m_pButtonLoopIn->set(0);
+    EXPECT_EQ(22050 * 2, m_pLoopStartPoint->get());
+
+    // Quarter beat resolution:
+    // Frame 12000 is closer to quarter beat (11025) than to 0 or 22050.
+    m_pQuantizeResolution->set(0.25);
+    setCurrentPosition(mixxx::audio::FramePos{12000});
+    m_pButtonLoopIn->set(1);
+    m_pButtonLoopIn->set(0);
+    EXPECT_EQ(11025 * 2, m_pLoopStartPoint->get());
 }
 
 TEST_F(LoopingControlTest, ReloopToggleButton_TogglesLoop) {
