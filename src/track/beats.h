@@ -333,6 +333,13 @@ class Beats : private std::enable_shared_from_this<Beats> {
     /// the closest beat in the track, or an invalid position if none exists.
     audio::FramePos findClosestBeat(audio::FramePos position) const;
 
+    /// Starting from frame position `position`, return the frame position of
+    /// the closest beat fraction (e.g. 0.5 for half-beat, 0.25 for quarter-beat)
+    /// in the track, or an invalid position if none exists.
+    audio::FramePos findClosestBeatFraction(
+            audio::FramePos position,
+            double beatFraction) const;
+
     /// Find the Nth beat from frame position `position`. Works with both
     /// positive and negative values of n. Calling findNthBeat with `n=0` is
     /// invalid and always returns an invalid frame position. Calling

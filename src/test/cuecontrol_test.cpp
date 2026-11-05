@@ -7,6 +7,7 @@ class CueControlTest : public BaseSignalPathTest {
         BaseSignalPathTest::SetUp();
 
         m_pQuantizeEnabled = std::make_unique<ControlProxy>(m_sGroup1, "quantize");
+        m_pQuantizeResolution = std::make_unique<ControlProxy>(m_sGroup1, "quantize_resolution");
         m_pCuePoint = std::make_unique<ControlProxy>(m_sGroup1, "cue_point");
         m_pIntroStartPosition = std::make_unique<ControlProxy>(m_sGroup1, "intro_start_position");
         m_pIntroStartEnabled = std::make_unique<ControlProxy>(m_sGroup1, "intro_start_enabled");
@@ -65,6 +66,7 @@ class CueControlTest : public BaseSignalPathTest {
     }
 
     std::unique_ptr<ControlProxy> m_pQuantizeEnabled;
+    std::unique_ptr<ControlProxy> m_pQuantizeResolution;
     std::unique_ptr<ControlProxy> m_pCuePoint;
     std::unique_ptr<ControlProxy> m_pIntroStartPosition;
     std::unique_ptr<ControlProxy> m_pIntroStartEnabled;
@@ -405,6 +407,57 @@ TEST_F(CueControlTest, FollowCueOnQuantize) {
     ProcessBuffer();
     EXPECT_FRAMEPOS_EQ_CONTROL(quantizedCuePos, m_pCuePoint);
     EXPECT_FRAMEPOS_EQ(mixxx::audio::kStartFramePos, getCurrentFramePos());
+}
+
+TEST_F(CueControlTest, QuantizeResolution_HalfAndQuarterBeat) {
+    TrackPointer pTrack = createTestTrack();
+    pTrack->trySetBpm(120.0);
+
+    const mixxx::audio::SampleRate sampleRate = pTrack->getSampleRate();
+    const double bpm = pTrack->getBpm();
+    const mixxx::audio::FrameDiff_t beatLengthFrames = (60.0 * sampleRate / bpm);
+
+    // 1.4 beats is closer to 1.5 than to 1.0 or 2.0
+    const auto cuePos1_4 = mixxx::audio::FramePos(1.4 * beatLengthFrames);
+    pTrack->setMainCuePosition(cuePos1_4);
+
+    loadTrack(pTrack);
+    m_pQuantizeEnabled->set(1);
+
+    // Full beat: 1.4 snaps to 1.0
+    m_pQuantizeResolution->set(1.0);
+    ProcessBuffer();
+    EXPECT_FRAMEPOS_EQ_CONTROL(mixxx::audio::FramePos(1.0 * beatLengthFrames), m_pCuePoint);
+
+    // Half beat: 1.4 snaps to 1.5
+    m_pQuantizeResolution->set(0.5);
+    ProcessBuffer();
+    EXPECT_FRAMEPOS_EQ_CONTROL(mixxx::audio::FramePos(1.5 * beatLengthFrames), m_pCuePoint);
+
+    // Quarter beat: 1.4 snaps to 1.5
+    m_pQuantizeResolution->set(0.25);
+    ProcessBuffer();
+    EXPECT_FRAMEPOS_EQ_CONTROL(mixxx::audio::FramePos(1.5 * beatLengthFrames), m_pCuePoint);
+
+    // Reload with 1.35 beats: for quarter beat it should snap to 1.25
+    unloadTrack();
+    const auto cuePos1_35 = mixxx::audio::FramePos(1.35 * beatLengthFrames);
+    pTrack->setMainCuePosition(cuePos1_35);
+    loadTrack(pTrack);
+    m_pQuantizeEnabled->set(1);
+    m_pQuantizeResolution->set(0.25);
+    ProcessBuffer();
+    EXPECT_FRAMEPOS_EQ_CONTROL(mixxx::audio::FramePos(1.25 * beatLengthFrames), m_pCuePoint);
+
+    // 1.8 beats: with 0.25 resolution, 1.8 snaps to 1.75
+    unloadTrack();
+    const auto cuePos1_8 = mixxx::audio::FramePos(1.8 * beatLengthFrames);
+    pTrack->setMainCuePosition(cuePos1_8);
+    loadTrack(pTrack);
+    m_pQuantizeEnabled->set(1);
+    m_pQuantizeResolution->set(0.25);
+    ProcessBuffer();
+    EXPECT_FRAMEPOS_EQ_CONTROL(mixxx::audio::FramePos(1.75 * beatLengthFrames), m_pCuePoint);
 }
 
 TEST_F(CueControlTest, SeekOnSetCueCDJ) {
