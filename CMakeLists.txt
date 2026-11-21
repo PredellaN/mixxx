@@ -4622,8 +4622,21 @@ target_link_libraries(mixxx-lib PRIVATE Reverb)
 
 # Rubberband
 option(RUBBERBAND "Enable the rubberband engine for pitch-bending" ON)
+option(
+  USE_BUNDLED_RUBBERBAND
+  "Build bundled Rubber Band library with optimized flags"
+  ON
+)
 if(RUBBERBAND)
-  find_package(rubberband REQUIRED)
+  if(
+    USE_BUNDLED_RUBBERBAND
+    AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/rubberband/CMakeLists.txt"
+  )
+    add_subdirectory(lib/rubberband EXCLUDE_FROM_ALL)
+    target_compile_definitions(mixxx-lib PUBLIC RUBBERBAND_STATIC)
+  else()
+    find_package(rubberband REQUIRED)
+  endif()
   target_link_libraries(mixxx-lib PUBLIC rubberband::rubberband)
   target_compile_definitions(mixxx-lib PUBLIC __RUBBERBAND__)
   target_sources(

@@ -12,64 +12,81 @@ case "$1" in
         ;;
 
     setup)
+        SUDO_CMD="sudo"
+        if [ "$EUID" -ne 0 ]; then
+            if ! sudo -n true 2>/dev/null && command -v pkexec >/dev/null 2>&1; then
+                SUDO_CMD="pkexec"
+            fi
+        else
+            SUDO_CMD=""
+        fi
+
         if grep -qP '^NAME=.*Fedora.*' /etc/os-release; then
-            # Add RPM Fusion repository (required for faad2 and ffmpeg-devel)
-            sudo dnf install -y "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm"
+            # Add RPM Fusion repository (required for faad2 and patent-encumbered formats)
+            $SUDO_CMD dnf install -y "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm" || true
         else
             echo "Warning: You are not running Fedora and may have to set up RPM Fusion manually if there are missing packages!"
         fi
 
         # Install the build dependencies.
-        # This list is largely identical to what `dnf builddep mixxx` would
-        # install, with the exception of replacing Qt 5 with Qt 6 (once 2.5 is
-        # released, we could install `dnf-command(builddep)` and then use `dnf
-        # builddep mixxx`).
-        sudo dnf install -y \
-            appstream \
-            ccache \
-            chrpath \
-            cmake \
-            desktop-file-utils \
-            faad2 \
-            ffmpeg-devel \
-            fftw-devel \
-            flac-devel \
-            gcc-c++ \
-            gmock-devel \
-            google-benchmark-devel \
-            gtest-devel \
-            guidelines-support-library-devel \
-            hidapi-devel \
-            lame-devel \
-            libchromaprint-devel \
-            libebur128-devel \
-            libid3tag-devel \
-            libmad-devel \
-            libmodplug-devel \
-            libmp4v2-devel \
-            libsndfile-devel \
-            libusb1-devel \
-            libvorbis-devel \
-            lilv-devel \
-            mesa-libGL-devel \
-            mesa-libGLU-devel \
-            mold \
-            ninja-build \
-            opus-devel \
-            opusfile-devel \
-            portaudio-devel \
-            portmidi-devel \
-            protobuf-compiler \
-            protobuf-lite-devel \
-            qt6-qt{5compat,base,base-private,declarative,shadertools,svg}-devel \
-            qtkeychain-qt6-devel \
-            rubberband-devel \
-            soundtouch-devel \
-            sqlite-devel \
-            taglib-devel \
-            upower-devel \
-            wavpack-devel \
-            zlib-devel
+        # Mixxx 2.5+ in Fedora uses Qt 6, so `dnf builddep mixxx` works directly.
+        # Fall back to explicit dnf install if builddep is unavailable.
+        if $SUDO_CMD dnf builddep -y mixxx 2>/dev/null; then
+            $SUDO_CMD dnf install -y \
+                ccache \
+                chrpath \
+                cmake \
+                mold \
+                ninja-build \
+                qt6-qtbase-private-devel
+        else
+            $SUDO_CMD dnf install -y --allowerasing \
+                appstream \
+                ccache \
+                chrpath \
+                cmake \
+                desktop-file-utils \
+                faad2 \
+                ffmpeg-free-devel \
+                fftw-devel \
+                flac-devel \
+                gcc-c++ \
+                gmock-devel \
+                google-benchmark-devel \
+                gtest-devel \
+                guidelines-support-library-devel \
+                hidapi-devel \
+                lame-devel \
+                libchromaprint-devel \
+                libebur128-devel \
+                libid3tag-devel \
+                libmad-devel \
+                libmodplug-devel \
+                libmp4v2-devel \
+                libsndfile-devel \
+                libusb1-devel \
+                libvorbis-devel \
+                lilv-devel \
+                mesa-libGL-devel \
+                mesa-libGLU-devel \
+                mold \
+                ninja-build \
+                opus-devel \
+                opusfile-devel \
+                portaudio-devel \
+                portmidi-devel \
+                protobuf-compiler \
+                protobuf-devel \
+                qt6-qt{5compat,base,base-private,declarative,shadertools,svg}-devel \
+                qtkeychain-qt6-devel \
+                rubberband-devel \
+                soundtouch-devel \
+                sqlite-devel \
+                taglib-devel \
+                upower-devel \
+                wavpack-devel \
+                zlib-ng-compat-devel
+        fi
         ;;
     *)
         echo "Usage: $0 [options]"
